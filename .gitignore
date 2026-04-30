@@ -1,0 +1,25 @@
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+
+# Environment — copy .env.example to .env and fill in your values
+.env
+.env.local
+.env.production
+.env.development
+
+# Claude Code local config
+.claude/
+
+# Screenshots captured by scripts
+screenshots/
+
+# Source maps
+*.js.map
+*.d.ts.map
+
+# Pipeline artifacts
+FORK_REPORT.md
+SANITIZATION_REPORT.md
