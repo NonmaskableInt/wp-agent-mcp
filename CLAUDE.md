@@ -69,6 +69,8 @@ src/
                   content_meta_set/delete
     templates.ts  template_list, template_get, template_resolve, template_set, template_reset,
                   template_backups, template_restore, template_validate, theme_validate
+    global-styles.ts  global_styles_get, global_styles_set, global_styles_reset,
+                  global_styles_backups, global_styles_restore
     cli.ts        wp_cli_run
     database.ts   db_list_tables, db_get_schema, db_select, db_query
 ```

@@ -238,6 +238,22 @@ describe.skipIf(!bridgeConfigured)('contract: templates (block theme)', () => {
       expect(JSON.stringify((await list()).templates.map((t) => t.id))).toBe(before);
     });
 
+    it('restore cannot be pointed at a real file elsewhere in the backup area via path traversal', async () => {
+      // A genuine global-styles backup sits in a sibling folder.
+      await s.call('global_styles_set', { styles: { color: { background: '#fedcba' } } });
+      const gs = await s.call('global_styles_reset');
+      expect(gs.isError, gs.text).toBe(false);
+      const other = (gs.json as { backup: string }).backup;
+      const before = JSON.stringify((await list()).templates.map((t) => t.id));
+
+      for (const name of [`../global-styles-backups/${other}`, `../../${other}`, `./${other}`, '../template-backups/../template-backups/x.json']) {
+        const r = await s.call('template_restore', { name });
+        expect(r.isError, name).toBe(true);
+        expect(r.text, name).toMatch(/validation_error/); // refused by the name pattern, not merely "file not found"
+      }
+      expect(JSON.stringify((await list()).templates.map((t) => t.id))).toBe(before);
+    });
+
     it('rejects unknown fields instead of ignoring a typo', async () => {
       const r = await fetch(`${BASE}/wp-json/agent/v1/templates/item`, {
         method: 'POST',

@@ -15,6 +15,7 @@ import { register as register_apps } from './tools/apps.js';
 import { register as register_headless } from './tools/headless.js';
 import { register as register_content } from './tools/content.js';
 import { register as register_templates } from './tools/templates.js';
+import { register as register_global_styles } from './tools/global-styles.js';
 
 export function create_server(): McpServer {
   const server = new McpServer({
@@ -39,6 +40,7 @@ export function create_server(): McpServer {
   register_headless(server, client);
   register_content(server, client);
   register_templates(server, client);
+  register_global_styles(server, client);
 
   return server;
 }
