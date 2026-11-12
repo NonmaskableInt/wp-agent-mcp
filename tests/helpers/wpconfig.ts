@@ -53,3 +53,7 @@ export const reset_site_options = () =>
     flush_rewrite_rules(false);
     delete_option("ct_custom_option");
   `);
+
+/** Switches back to the block theme the dev site ships with (a failed theme test must not strand the site). */
+export const reset_theme = (stylesheet = 'twentytwentyfive') =>
+  sh('php', '-r', `define("WP_USE_THEMES", false); require "/var/www/html/wp-load.php"; if (get_stylesheet() !== "${stylesheet}") switch_theme("${stylesheet}"); foreach (get_posts(["post_type" => ["wp_template","wp_template_part"], "post_status" => "any", "numberposts" => -1]) as $p) if (strpos($p->post_name, "ct-") === 0 || strpos($p->post_title, "CT ") === 0 || $p->post_name === "single" || $p->post_name === "header") wp_delete_post($p->ID, true);`);

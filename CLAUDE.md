@@ -67,6 +67,8 @@ src/
     headless.ts   headless_get, headless_set, headless_preview_link
     content.ts    content_model_get, content_type_set/delete, content_taxonomy_set/delete,
                   content_meta_set/delete
+    templates.ts  template_list, template_get, template_resolve, template_set, template_reset,
+                  template_backups, template_restore
     cli.ts        wp_cli_run
     database.ts   db_list_tables, db_get_schema, db_select, db_query
 ```
