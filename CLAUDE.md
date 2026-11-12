@@ -62,7 +62,8 @@ src/
     files.ts      file_list, file_read, file_write, file_delete, file_backups,
                   file_restore
     apps.ts       app_deploy, app_list, app_get, app_rollback, app_delete
-                  (app_deploy zips a local build_dir with fflate, or takes a prebuilt zip)
+                  (app_deploy zips a local build_dir with fflate, or takes a prebuilt zip;
+                  build_dir is confined to WP_MCP_BUILD_ROOT — see Configuration)
     headless.ts   headless_get, headless_set, headless_preview_link
     content.ts    content_model_get, content_type_set/delete, content_taxonomy_set/delete,
                   content_meta_set/delete
@@ -96,6 +97,7 @@ All configuration is via environment variables. Copy `.env.example` to `.env`:
 | `MCP_TRANSPORT` | No | `stdio` (default) or `http` |
 | `MCP_HTTP_PORT` | No | HTTP port when `MCP_TRANSPORT=http` (default: `3456`) |
 | `LOG_LEVEL` | No | `debug`, `info` (default), `warn`, or `error` |
+| `WP_MCP_BUILD_ROOT` | No | Directory `app_deploy`'s `build_dir` must live inside (default: the server's working directory). Refuses `/` and your home directory. Keeps an agent from publishing arbitrary local files to the site. |
 
 ## Contributing
 

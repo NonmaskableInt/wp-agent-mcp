@@ -206,29 +206,86 @@ describe.skipIf(!bridgeConfigured)('contract: apps', () => {
 describe.skipIf(!bridgeConfigured)('contract: apps from a local build directory', () => {
   const slug = `${SLUG}-dir`;
   let s: Awaited<ReturnType<typeof connect>>;
-  let dir: string;
+  let base: string; // the allowed build root
+  let dir: string; // base/dist
+  let outside: string; // a directory outside the root
+  let previous_root: string | undefined;
+
   beforeAll(async () => {
     s = await connect();
-    const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises');
+    const { mkdtemp, mkdir, realpath, writeFile } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
-    dir = await mkdtemp(join(tmpdir(), 'build-'));
-    await mkdir(join(dir, 'assets'));
+    base = await realpath(await mkdtemp(join(tmpdir(), 'build-root-')));
+    dir = join(base, 'dist');
+    await mkdir(join(dir, 'assets'), { recursive: true });
     await writeFile(join(dir, 'index.html'), '<!doctype html><div id="root"></div><!-- from-dir -->');
     await writeFile(join(dir, 'assets', 'main.js'), 'console.log("from-dir")');
+    await writeFile(join(dir, '.env'), 'SECRET=should-never-upload');
+
+    outside = await realpath(await mkdtemp(join(tmpdir(), 'build-outside-')));
+    await writeFile(join(outside, 'index.html'), '<div id="root">outside-secret</div>');
+    await writeFile(join(outside, 'credentials.json'), '{"token":"outside-secret"}');
+
+    previous_root = process.env.WP_MCP_BUILD_ROOT;
+    process.env.WP_MCP_BUILD_ROOT = base;
   });
   afterAll(async () => {
+    if (previous_root === undefined) delete process.env.WP_MCP_BUILD_ROOT;
+    else process.env.WP_MCP_BUILD_ROOT = previous_root;
     await s?.call('app_delete', { slug });
     await s?.close();
     const { rm } = await import('node:fs/promises');
-    await rm(dir, { recursive: true, force: true });
+    await rm(base, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
   });
 
-  it('zips build_dir, deploys it and serves it', async () => {
+  it('zips build_dir, deploys it, serves it, and reports exactly which files were uploaded', async () => {
     const d = await s.call('app_deploy', { slug, mount: `${MOUNT}-dir`, build_dir: dir });
     expect(d.isError, d.text).toBe(false);
     expect((await get(`${MOUNT}-dir/`)).text).toContain('from-dir');
     expect((await get(`${MOUNT}-dir/assets/main.js`)).status).toBe(200);
+
+    const uploaded = (d.json as { uploaded: { source: string; file_count: number; files: string[] } }).uploaded;
+    expect(uploaded.source).toBe(dir);
+    expect([...uploaded.files].sort()).toEqual(['assets/main.js', 'index.html']);
+    expect(uploaded.files).not.toContain('.env'); // hidden files never leave the machine
+  });
+
+  it('accepts a path relative to the allowed root', async () => {
+    const d = await s.call('app_deploy', { slug, mount: `${MOUNT}-dir`, build_dir: 'dist' });
+    expect(d.isError, d.text).toBe(false);
+  });
+
+  it.each([
+    ['a directory outside the root', () => outside],
+    ['a .. traversal out of the root', () => `${base}/../${outside.split('/').pop()}`],
+    ['the filesystem root', () => '/'],
+    ['/etc', () => '/etc'],
+    ['the home directory', async () => (await import('node:os')).homedir()],
+  ])('refuses %s and uploads nothing', async (_l, pick) => {
+    const target = await pick();
+    const before = JSON.stringify((await s.call('app_list')).json);
+    const d = await s.call('app_deploy', { slug: `${SLUG}-esc`, mount: `${MOUNT}-esc`, build_dir: target });
+    expect(d.isError, d.text).toBe(true);
+    expect(d.text).toMatch(/deploy_failed/);
+    expect(d.text).not.toContain('outside-secret');
+    expect(JSON.stringify((await s.call('app_list')).json)).toBe(before);
+    expect((await get(`${MOUNT}-esc/`)).text).not.toContain('outside-secret');
+  });
+
+  it('refuses a symlink inside the root that leads outside it', async () => {
+    const { symlink, rm } = await import('node:fs/promises');
+    const link = `${base}/linked-dist`;
+    await symlink(outside, link);
+    try {
+      const d = await s.call('app_deploy', { slug: `${SLUG}-lnk`, mount: `${MOUNT}-lnk`, build_dir: link });
+      expect(d.isError, d.text).toBe(true);
+      expect(d.text).toMatch(/outside/);
+      expect((await get(`${MOUNT}-lnk/`)).text).not.toContain('outside-secret');
+    } finally {
+      await rm(link, { force: true });
+    }
   });
 
   it('requires exactly one of build_dir / archive_base64', async () => {
@@ -239,7 +296,7 @@ describe.skipIf(!bridgeConfigured)('contract: apps from a local build directory'
   });
 
   it('reports a missing build_dir as a tool error, not a crash', async () => {
-    const d = await s.call('app_deploy', { slug, mount: `${MOUNT}-dir`, build_dir: '/nonexistent/path/xyz' });
+    const d = await s.call('app_deploy', { slug, mount: `${MOUNT}-dir`, build_dir: `${base}/nonexistent` });
     expect(d.isError).toBe(true);
     expect(d.text).toMatch(/deploy_failed/);
   });
