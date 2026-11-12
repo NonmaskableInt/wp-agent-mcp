@@ -31,3 +31,25 @@ export const clear_test_constants = () => run('clear_all');
 
 /** Run PHP inside the container (as root) and return stdout. */
 export const sh = (...cmd: string[]) => execFileSync('podman', ['exec', container!, ...cmd], { encoding: 'utf8' });
+
+/**
+ * Puts the options the option-group tests touch back to known defaults, straight through the
+ * container. A failing (or deliberately mutated) run can leave the site unreachable through its own
+ * API — e.g. plain permalinks remove /wp-json/ — so cleanup must not depend on the API working.
+ */
+export const reset_site_options = () =>
+  sh('php', '-r', `
+    define("WP_USE_THEMES", false); require "/var/www/html/wp-load.php";
+    foreach ([
+      "timezone_string" => "", "date_format" => "F j, Y", "time_format" => "g:i a", "start_of_week" => 1,
+      "posts_per_page" => 10, "posts_per_rss" => 10, "default_comment_status" => "open", "default_ping_status" => "open",
+      "require_name_email" => 1, "comment_registration" => 0, "close_comments_for_old_posts" => 0, "close_comments_days_old" => 14,
+      "thread_comments" => 1, "comments_per_page" => 50, "thumbnail_size_w" => 150, "thumbnail_size_h" => 150,
+      "medium_size_w" => 300, "medium_size_h" => 300, "large_size_w" => 1024, "large_size_h" => 1024,
+      "show_on_front" => "posts", "page_on_front" => 0, "page_for_posts" => 0, "category_base" => "", "tag_base" => "",
+      "blogname" => "Bridge Dev", "blogdescription" => "", "permalink_structure" => "/%postname%/",
+      "siteurl" => "http://127.0.0.1:8088", "home" => "http://127.0.0.1:8088",
+    ] as $k => $v) update_option($k, $v);
+    flush_rewrite_rules(false);
+    delete_option("ct_custom_option");
+  `);

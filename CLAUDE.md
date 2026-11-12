@@ -50,7 +50,7 @@ src/
     media.ts      media_list, media_get, media_upload, media_update, media_replace,
                   media_regenerate_sizes, media_delete
     taxonomy.ts   term_list, term_create, term_update, term_delete
-    options.ts    option_get, option_set
+    options.ts    option_get, option_set, option_schema
     menus.ts      menu_list, menu_get, menu_item_add, menu_item_update, menu_item_delete
     plugins.ts    plugin_list, plugin_get, plugin_install, plugin_activate,
                   plugin_deactivate, plugin_update, plugin_delete,
