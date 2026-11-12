@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { config } from './config.js';
 import { enrich_error, explain_http_failure, explain_network_error } from './errors.js';
 import { BridgeError, BridgeEnvelope } from './types.js';
+import { fetch_same_origin, is_redirect, redirect_message } from './safe-fetch.js';
 
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 500;
@@ -50,7 +51,8 @@ async function fetch_with_retry(
   attempt = 1,
 ): Promise<Response> {
   try {
-    const res = await fetch(url, init);
+    const res = await fetch_same_origin(url, init);
+    if (is_redirect(res.status)) throw new BridgeError('redirect_blocked', redirect_message(res, url), res.status);
     if (res.status >= 500 && attempt < MAX_RETRIES) {
       const delay = RETRY_BASE_MS * Math.pow(2, attempt - 1);
       await new Promise(r => setTimeout(r, delay));
@@ -58,6 +60,7 @@ async function fetch_with_retry(
     }
     return res;
   } catch (err) {
+    if (err instanceof BridgeError) throw err; // e.g. a blocked redirect: retrying cannot help
     if (attempt < MAX_RETRIES) {
       const delay = RETRY_BASE_MS * Math.pow(2, attempt - 1);
       await new Promise(r => setTimeout(r, delay));

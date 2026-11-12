@@ -5,6 +5,7 @@ export interface FakeResponse {
   status: number;
   body?: unknown; // object => JSON; string => sent as-is
   type?: string;
+  headers?: Record<string, string>;
 }
 export type Handler = (req: IncomingMessage) => FakeResponse;
 
@@ -18,7 +19,7 @@ export async function start_fake_wp(routes: Record<string, Handler>): Promise<{ 
     const handler = routes[key] ?? routes[`* ${path}`] ?? routes['*'];
     const r = handler ? handler(req) : { status: 404, body: '<html><body>Not Found</body></html>' };
     const is_json = typeof r.body === 'object' && r.body !== null;
-    res.writeHead(r.status, { 'Content-Type': r.type ?? (is_json ? 'application/json' : 'text/html; charset=UTF-8') });
+    res.writeHead(r.status, { 'Content-Type': r.type ?? (is_json ? 'application/json' : 'text/html; charset=UTF-8'), ...(r.headers ?? {}) });
     res.end(r.body === undefined ? '' : is_json ? JSON.stringify(r.body) : String(r.body));
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
