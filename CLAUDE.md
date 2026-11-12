@@ -29,7 +29,10 @@ npm test                # Run tests with vitest
 # Contract tests (tests/contract) drive the real MCP tools against a live bridge and
 # skip themselves unless BRIDGE_TEST_URL / BRIDGE_TEST_USER / BRIDGE_TEST_PASSWORD are set.
 # Test files run one at a time (fileParallelism: false) because they share one WordPress.
-# Stand up a throwaway WordPress with ../php-agent-bridge/dev (see its CLAUDE.md).
+# Stand up a throwaway WordPress and run everything with one command:
+#   ../php-agent-bridge/dev/run-contract-tests.sh .   (see that repo's CLAUDE.md; needs podman or docker)
+# CI (.github/workflows/ci.yml) runs typecheck + build + unit tests on Node 20/22, then this against the
+# php-agent-bridge branch with the same name as the PR's (else main).
 
 # Run the compiled server directly
 node dist/index.js      # stdio transport (default)

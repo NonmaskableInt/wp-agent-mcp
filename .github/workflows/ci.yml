@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Typecheck, build, unit tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc --noEmit
+      - run: npm run build
+      # No bridge is configured here, so the contract tests skip and only the unit tests run.
+      - run: npx vitest run
+
+  contract:
+    name: Contract tests (real WordPress)
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mcp
+
+      # The WordPress side lives in php-agent-bridge. Use its branch with the same name as this one
+      # when it exists (so paired PRs test each other), otherwise main.
+      - name: Pick the matching php-agent-bridge branch
+        id: pair
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          if git ls-remote --exit-code --heads "https://github.com/${OWNER}/php-agent-bridge.git" "$BRANCH" >/dev/null 2>&1; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/php-agent-bridge
+          ref: ${{ steps.pair.outputs.ref }}
+          path: bridge
+      - run: echo "Testing this MCP server against php-agent-bridge@${{ steps.pair.outputs.ref }}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: mcp
+
+      - name: Run the contract tests against that bridge
+        env:
+          CONTAINER_CLI: docker
+        run: bridge/dev/run-contract-tests.sh mcp
