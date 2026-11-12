@@ -123,4 +123,36 @@ export function register(server: McpServer, client: BridgeClient): void {
       }
     },
   );
+
+  server.tool(
+    'template_validate',
+    'Check block markup WITHOUT saving it: unbalanced or mismatched blocks, invalid JSON attributes (errors), unregistered blocks and ' +
+      'HTML outside blocks (warnings), each with a line number. WordPress\'s own parser is forgiving and silently renders broken markup, ' +
+      'so run this on anything you write. template_set also returns this as "validation".',
+    { content: any('Block markup (string, max 500000 bytes)') },
+    { readOnlyHint: true },
+    async (input) => {
+      try {
+        return tool_success(await client.post('/theme-tools/validate-markup', { content: input.content }));
+      } catch (err) {
+        return handle_tool_error(err);
+      }
+    },
+  );
+
+  server.tool(
+    'theme_validate',
+    'Check an installed theme (default: the active one) before activating it: style.css header, index template, parent theme, theme.json ' +
+      '(valid JSON, known keys, properties WordPress would silently ignore), block markup in templates/parts, template parts that are ' +
+      'referenced but missing, and PHP syntax. Returns errors and warnings with codes, files and lines.',
+    { stylesheet: any('Theme directory name; omit for the active theme') },
+    { readOnlyHint: true },
+    async (input) => {
+      try {
+        return tool_success(await client.get('/theme-tools/validate', input.stylesheet ? { stylesheet: String(input.stylesheet) } : undefined));
+      } catch (err) {
+        return handle_tool_error(err);
+      }
+    },
+  );
 }
