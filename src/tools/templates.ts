@@ -155,4 +155,28 @@ export function register(server: McpServer, client: BridgeClient): void {
       }
     },
   );
+
+  server.tool(
+    'theme_scaffold',
+    'Create a working theme in one step: type "block" (theme.json + block templates and parts), "classic" (PHP templates), or "child" ' +
+      '(needs parent: an installed, non-child theme; block parents are inherited, classic parents get their stylesheet enqueued). The theme is ' +
+      'built in a staging directory, PHP is linted, and it must pass theme_validate before it is moved into place. It is NOT activated: ' +
+      'call theme_activate when ready. Never overwrites an existing theme. Writes files, so it needs AGENT_BRIDGE_ALLOW_FILE_WRITE and ' +
+      'respects DISALLOW_FILE_EDIT/MODS. Then customise with file_write (PHP, theme.json), template_set and global_styles_set.',
+    {
+      type: any('"block" | "classic" | "child"'),
+      slug: z.string().describe('Directory name: lowercase letters, digits, dashes; starts with a letter; 2–41 chars'),
+      name: any('Display name, 1–60 chars, one line (no "*/" or "<?")'),
+      description: any('Optional, up to 200 chars, one line'),
+      author: any('Optional, up to 60 chars, one line'),
+      parent: any('child only: the parent theme directory'),
+    },
+    async (input) => {
+      try {
+        return tool_success(await client.post('/theme-tools/scaffold', defined(input)));
+      } catch (err) {
+        return handle_tool_error(err);
+      }
+    },
+  );
 }
