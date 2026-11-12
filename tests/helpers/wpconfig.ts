@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 /**
  * Toggles real wp-config.php constants in the dev container, so tests can exercise
@@ -6,6 +6,8 @@ import { execFileSync } from 'node:child_process';
  * Every line is tagged so it can always be removed again.
  */
 export const container = process.env.BRIDGE_TEST_CONTAINER;
+/** Container runtime: CONTAINER_CLI, else podman, else docker (matches php-agent-bridge/dev). */
+const cli = process.env.CONTAINER_CLI ?? (spawnSync('podman', ['--version']).status === 0 ? 'podman' : 'docker');
 
 const SCRIPT = `
 $f = "/var/www/html/wp-config.php";
@@ -23,14 +25,14 @@ if ($mode === "clear_all") {
 file_put_contents($f, $s);
 `;
 
-const run = (...args: string[]) => execFileSync('podman', ['exec', container!, 'php', '-r', SCRIPT, '--', ...args], { encoding: 'utf8' });
+const run = (...args: string[]) => execFileSync(cli, ['exec', container!, 'php', '-r', SCRIPT, '--', ...args], { encoding: 'utf8' });
 
 export const set_constant = (name: string, literal = 'true') => run('set', name, literal);
 export const unset_constant = (name: string) => run('unset', name);
 export const clear_test_constants = () => run('clear_all');
 
 /** Run PHP inside the container (as root) and return stdout. */
-export const sh = (...cmd: string[]) => execFileSync('podman', ['exec', container!, ...cmd], { encoding: 'utf8' });
+export const sh = (...cmd: string[]) => execFileSync(cli, ['exec', container!, ...cmd], { encoding: 'utf8' });
 
 /**
  * Puts the options the option-group tests touch back to known defaults, straight through the

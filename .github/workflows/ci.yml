@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Typecheck, build, unit tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc --noEmit
+      - run: npm run build
+      # No bridge is configured here, so the contract tests skip and only the unit tests run.
+      - run: npx vitest run
+
+  contract:
+    name: Contract tests (real WordPress)
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mcp
+
+      # The WordPress side lives in php-agent-bridge. Pair with its branch of the same name ONLY while that
+      # branch has an open pull request from the same owner (so paired PRs test each other); otherwise use
+      # main. Checking for an open PR matters: a branch whose PR already merged still exists and is stale.
+      - name: Pick the matching php-agent-bridge ref
+        id: pair
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          OWNER: ${{ github.repository_owner }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open_prs=$(gh api -X GET "repos/${OWNER}/php-agent-bridge/pulls" -f state=open -f head="${OWNER}:${BRANCH}" --jq 'length' 2>/dev/null || echo 0)
+          if [ "${open_prs:-0}" -gt 0 ]; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/php-agent-bridge
+          ref: ${{ steps.pair.outputs.ref }}
+          path: bridge
+      - run: echo "Testing this MCP server against php-agent-bridge@${{ steps.pair.outputs.ref }}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: mcp
+
+      - name: Run the contract tests against that bridge
+        env:
+          CONTAINER_CLI: docker
+        run: bridge/dev/run-contract-tests.sh mcp

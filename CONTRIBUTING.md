@@ -33,3 +33,23 @@ Use the GitHub issue templates. For security vulnerabilities, please open a priv
 ## License
 
 By contributing you agree that your contributions will be licensed under the MIT License.
+
+## Tests and CI
+
+```bash
+npm test          # typecheck-free unit tests; the contract tests skip without a WordPress
+npx tsc --noEmit  # typecheck
+```
+
+The **contract tests** drive the real MCP tools against a real WordPress with the
+[php-agent-bridge](https://github.com/NonmaskableInt/php-agent-bridge) plugin. With `podman` or `docker`
+installed, one command builds a throwaway stack, runs them, and removes it:
+
+```bash
+../php-agent-bridge/dev/run-contract-tests.sh .
+```
+
+Pull requests run CI automatically: typecheck, build and unit tests on Node 20 and 22, then the contract
+tests against the php-agent-bridge branch **with the same name as yours** while that branch has an open PR (so a change
+spanning both repos is tested together), otherwise against its `main`. (A merged branch that still exists is ignored on
+purpose: it is stale.)

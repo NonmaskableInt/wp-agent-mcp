@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { afterAll, describe, expect, it } from 'vitest';
 import { bridgeConfigured } from '../helpers/bridge.js';
+import { sh } from '../helpers/wpconfig.js';
 
 /**
  * Runtime safety must not depend on write-time validation: whatever is in the stored option
@@ -10,8 +10,7 @@ import { bridgeConfigured } from '../helpers/bridge.js';
 const CONTAINER = process.env.BRIDGE_TEST_CONTAINER;
 const BASE = (process.env.BRIDGE_TEST_URL ?? '').replace(/\/$/, '');
 
-const php = (code: string) =>
-  execFileSync('podman', ['exec', CONTAINER!, 'php', '-r', `define("WP_USE_THEMES", false); require "/var/www/html/wp-load.php"; ${code}`], { encoding: 'utf8' });
+const php = (code: string) => sh('php', '-r', `define("WP_USE_THEMES", false); require "/var/www/html/wp-load.php"; ${code}`);
 
 describe.skipIf(!bridgeConfigured || !CONTAINER)('contract: hostile stored content model', () => {
   afterAll(() => {
