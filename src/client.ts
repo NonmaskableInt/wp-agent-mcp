@@ -6,9 +6,13 @@ import { BridgeError, BridgeEnvelope } from './types.js';
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 500;
 
-function auth_header(): string {
-  const creds = Buffer.from(`${config.wp.username}:${config.wp.appPassword}`).toString('base64');
-  return `Basic ${creds}`;
+/**
+ * The same Basic credentials twice: `Authorization`, and `X-Agent-Authorization` for networks that strip the
+ * former (the bridge only uses the second when the first is absent).
+ */
+function auth_headers(): Record<string, string> {
+  const creds = `Basic ${Buffer.from(`${config.wp.username}:${config.wp.appPassword}`).toString('base64')}`;
+  return { Authorization: creds, 'X-Agent-Authorization': creds };
 }
 
 function log_debug(method: string, path: string, status: number, elapsed: number): void {
@@ -89,7 +93,7 @@ export class BridgeClient {
     const url = this.url(path, params);
     const start = Date.now();
     const res = await fetch_with_retry(url, {
-      headers: { Authorization: auth_header() },
+      headers: auth_headers(),
     });
     log_debug('GET', path, res.status, Date.now() - start);
     return parse_response<T>(res);
@@ -101,7 +105,7 @@ export class BridgeClient {
     const res = await fetch_with_retry(url, {
       method: 'POST',
       headers: {
-        Authorization: auth_header(),
+        ...auth_headers(),
         'Content-Type': 'application/json',
         'X-Idempotency-Key': randomUUID(),
       },
@@ -117,7 +121,7 @@ export class BridgeClient {
     const res = await fetch_with_retry(url, {
       method: 'PATCH',
       headers: {
-        Authorization: auth_header(),
+        ...auth_headers(),
         'Content-Type': 'application/json',
         'X-Idempotency-Key': randomUUID(),
       },
@@ -133,7 +137,7 @@ export class BridgeClient {
     const res = await fetch_with_retry(url, {
       method: 'DELETE',
       headers: {
-        Authorization: auth_header(),
+        ...auth_headers(),
         'X-Idempotency-Key': randomUUID(),
       },
     });
@@ -160,7 +164,7 @@ export class BridgeClient {
     const res = await fetch_with_retry(url, {
       method: 'POST',
       headers: {
-        Authorization: auth_header(),
+        ...auth_headers(),
         'X-Idempotency-Key': randomUUID(),
       },
       body: form,

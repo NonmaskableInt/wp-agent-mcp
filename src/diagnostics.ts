@@ -42,7 +42,7 @@ type Outcome =
 async function request(url: string, timeoutMs: number, authorization?: string): Promise<Outcome> {
   try {
     const res = await fetch(url, {
-      headers: { Accept: 'application/json', ...(authorization ? { Authorization: authorization } : {}) },
+      headers: { Accept: 'application/json', ...(authorization ? { Authorization: authorization, 'X-Agent-Authorization': authorization } : {}) },
       signal: AbortSignal.timeout(timeoutMs),
     });
     const text = await res.text();
