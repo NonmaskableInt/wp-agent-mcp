@@ -50,7 +50,7 @@ src/
     media.ts      media_list, media_get, media_upload, media_update, media_replace,
                   media_regenerate_sizes, media_delete
     taxonomy.ts   term_list, term_create, term_update, term_delete
-    options.ts    option_get, option_set
+    options.ts    option_get, option_set, option_schema
     menus.ts      menu_list, menu_get, menu_item_add, menu_item_update, menu_item_delete
     plugins.ts    plugin_list, plugin_get, plugin_install, plugin_activate,
                   plugin_deactivate, plugin_update, plugin_delete,
@@ -67,6 +67,10 @@ src/
     headless.ts   headless_get, headless_set, headless_preview_link
     content.ts    content_model_get, content_type_set/delete, content_taxonomy_set/delete,
                   content_meta_set/delete
+    templates.ts  template_list, template_get, template_resolve, template_set, template_reset,
+                  template_backups, template_restore, template_validate, theme_validate, theme_scaffold
+    global-styles.ts  global_styles_get, global_styles_set, global_styles_reset,
+                  global_styles_backups, global_styles_restore
     cli.ts        wp_cli_run
     database.ts   db_list_tables, db_get_schema, db_select, db_query
 ```
