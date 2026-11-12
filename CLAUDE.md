@@ -48,6 +48,10 @@ src/
   server.ts       Creates McpServer and registers all tool modules
   client.ts       BridgeClient — authenticated HTTP fetch with retry logic
   types.ts        BridgeEnvelope, BridgeError, tool_success/tool_error helpers
+  env.ts          validate_env (all problems at once; trims quotes), config_help
+  errors.ts       explain_http_failure / explain_network_error / enrich_error: plain-language failures
+  diagnostics.ts  run_diagnostics (config → reach → authenticate → bridge) + format_report; used by
+                  the bridge_status tool and `node dist/index.js --check` (check.ts)
   tools/
     posts.ts      post_list, post_get, post_upsert, post_delete, post_duplicate
     media.ts      media_list, media_get, media_upload, media_update, media_replace,
@@ -67,6 +71,7 @@ src/
     apps.ts       app_deploy, app_list, app_get, app_rollback, app_delete
                   (app_deploy zips a local build_dir with fflate, or takes a prebuilt zip;
                   build_dir is confined to WP_MCP_BUILD_ROOT — see Configuration)
+    status.ts     bridge_status
     headless.ts   headless_get, headless_set, headless_preview_link
     content.ts    content_model_get, content_type_set/delete, content_taxonomy_set/delete,
                   content_meta_set/delete

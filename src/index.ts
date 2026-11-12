@@ -1,8 +1,15 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { config } from './config.js';
-import { create_server } from './server.js';
 
 async function main(): Promise<void> {
+  // Diagnose a setup from the command line, without an MCP client. Must not load ./config.js,
+  // which exits when the configuration is incomplete; the check reports that itself.
+  if (process.argv.includes('--check')) {
+    const { run_check } = await import('./check.js');
+    process.exit(await run_check());
+  }
+
+  const { config } = await import('./config.js');
+  const { create_server } = await import('./server.js');
   const server = create_server();
 
   if (config.transport === 'http') {

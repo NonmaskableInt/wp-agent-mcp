@@ -63,6 +63,12 @@ LOG_LEVEL=info
 | `MCP_TRANSPORT` | No | `stdio` (default) or `http` |
 | `MCP_HTTP_PORT` | No | HTTP listen port (default: `3456`) |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn`, or `error` (default: `info`) |
+| `WP_MCP_BUILD_ROOT` | No | Directory `app_deploy`'s `build_dir` must live inside (default: the working directory) |
+
+> **A `.env` file is only read when you run the server yourself from a terminal.** An MCP client (Claude
+> Desktop, Claude Code, …) does **not** load it: put the three `WP_*` settings in the `env` block of the
+> server's entry in the client's configuration (see below). Then check your setup with
+> `node dist/index.js --check`, which needs no MCP client.
 
 ### Creating a WordPress Application Password
 
@@ -211,6 +217,50 @@ The server will accept MCP connections on `http://localhost:3456`.
 | `option_get` | Get one or more WordPress options by key |
 | `option_set` | Set one or more allowlisted WordPress options |
 
+### Diagnostics
+
+| Tool | Description |
+|------|-------------|
+| `bridge_status` | Check the connection step by step (config, reach, authenticate, bridge) with a plain-language hint for each failure; on success reports the bridge version and what it allows on this site (file writes, `DISALLOW_FILE_EDIT`, CLI mode, option groups, whether PHP can be verified). Call it first when anything fails |
+
+### Options (continued)
+
+| Tool | Description |
+|------|-------------|
+| `option_schema` | Describe the option groups, each key's type and limits, which groups are on, and which keys can never be set |
+
+### Files
+
+| Tool | Description |
+|------|-------------|
+| `file_list`, `file_read` | Browse and read files under `themes`, `plugins`, `mu-plugins`, `agent-apps` |
+| `file_write` | Create or replace a file. PHP is linted and boot-tested, with automatic rollback. Needs `AGENT_BRIDGE_ALLOW_FILE_WRITE` and no `DISALLOW_FILE_EDIT` |
+| `file_delete`, `file_backups`, `file_restore` | Delete (backed up first), list previous versions, restore |
+
+### Apps
+
+| Tool | Description |
+|------|-------------|
+| `app_deploy` | Deploy a built front end (React, Vue, static) from a local `build_dir` or a zip and serve it at a mount path |
+| `app_list`, `app_get`, `app_rollback`, `app_delete` | Inspect, roll back to an earlier release, remove |
+
+### Headless and content model
+
+| Tool | Description |
+|------|-------------|
+| `headless_get`, `headless_set`, `headless_preview_link` | CORS allowlist, redirect to a separate front end, preview links |
+| `content_model_get`, `content_type_set`/`_delete`, `content_taxonomy_set`/`_delete`, `content_meta_set`/`_delete` | Custom post types, taxonomies and typed meta fields as data, with REST enabled |
+
+### Templates, styles and themes
+
+| Tool | Description |
+|------|-------------|
+| `template_list`, `template_get`, `template_resolve` | What renders a page; block templates with their source (theme file or database override) |
+| `template_set`, `template_reset`, `template_backups`, `template_restore` | Manage database template overrides (backed up before removal) |
+| `template_validate`, `theme_validate` | Check block markup and whole themes before trusting or activating them |
+| `global_styles_get`, `global_styles_set`, `global_styles_reset`, `global_styles_backups`, `global_styles_restore` | The Site Editor's user-level `theme.json` layer |
+| `theme_scaffold` | Create a block, classic or child theme (never activated, never overwrites) |
+
 ### Users
 
 | Tool | Description |
@@ -232,6 +282,29 @@ The server will accept MCP connections on `http://localhost:3456`.
 | `db_get_schema` | Inspect columns and indexes for a table |
 | `db_select` | Run a SELECT/SHOW/EXPLAIN query with prepared statements |
 | `db_query` | Run INSERT/UPDATE/DELETE with prepared statements |
+
+## Troubleshooting
+
+Run the self-check first. It needs no MCP client and shows exactly which step fails:
+
+```bash
+WP_BASE_URL=https://example.com WP_USERNAME=me WP_APP_PASSWORD='…' node dist/index.js --check
+```
+
+or call the `bridge_status` tool from inside your client. Steps: **config** → **reach** the REST API →
+**authenticate** → **bridge** plugin. Each reports `OK`, `WARN` or `FAIL` with a hint, and the password is never printed.
+
+| Symptom | Usual cause |
+|---------|-------------|
+| Client says only **"Connection closed"** / the server won't start | The three `WP_*` settings never reached the server. A client does not read `.env`; set the `env` block in its config. The real message ("Missing WP_APP_PASSWORD …") is on the server's stderr |
+| `node dist/index.js` fails: **cannot find `dist/index.js`** | Not built yet: `npm ci && npm run build` (`dist/` is not committed) |
+| `HTTP 404 … does not serve the WordPress REST API` | Wrong `WP_BASE_URL`. A `www.` address can be a different site than the bare domain |
+| `HTTP 401 … authentication failed` | Use an **application password** (Users → Profile → Application Passwords), not the login password. It cannot be used to log in to wp-admin |
+| `HTTP 406 … blocked by the host's web application firewall` | The host rejected the request before WordPress saw it |
+| `The TLS certificate does not match the name` | The site's certificate has not been issued for that address yet |
+| Bridge step: **not found** | Install and activate the php-agent-bridge plugin on the site |
+| Bridge step: **needs an administrator** | Use an administrator account |
+| Writes refused: `file_write_disabled` / `file_edit_disabled` | `AGENT_BRIDGE_ALLOW_FILE_WRITE` is not set, or `DISALLOW_FILE_EDIT`/`DISALLOW_FILE_MODS` is. `bridge_status` shows which |
 
 ## Development
 
