@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { config } from './config.js';
+import { enrich_error, explain_http_failure, explain_network_error } from './errors.js';
 import { BridgeError, BridgeEnvelope } from './types.js';
 
 const MAX_RETRIES = 3;
@@ -17,15 +18,23 @@ function log_debug(method: string, path: string, status: number, elapsed: number
 }
 
 async function parse_response<T>(res: Response): Promise<T> {
-  let body: BridgeEnvelope<T>;
+  let text = '';
+  let body: BridgeEnvelope<T> | undefined;
   try {
-    body = await res.json() as BridgeEnvelope<T>;
+    text = await res.text();
+    body = JSON.parse(text) as BridgeEnvelope<T>;
   } catch {
-    throw new BridgeError('parse_error', `Non-JSON response (status ${res.status})`, res.status);
+    body = undefined;
+  }
+
+  if (!body || typeof body !== 'object') {
+    const e = explain_http_failure({ status: res.status, url: res.url, contentType: res.headers.get('content-type') ?? '', body: text });
+    throw new BridgeError(e.code, e.message, res.status);
   }
 
   if (!body.ok) {
-    throw new BridgeError(body.code ?? 'unknown_error', body.message ?? 'Unknown error', res.status);
+    const code = body.code ?? 'unknown_error';
+    throw new BridgeError(code, enrich_error(code, body.message ?? 'Unknown error', res.status), res.status);
   }
 
   return body.data as T;
@@ -50,7 +59,8 @@ async function fetch_with_retry(
       await new Promise(r => setTimeout(r, delay));
       return fetch_with_retry(url, init, attempt + 1);
     }
-    throw err;
+    const e = explain_network_error(err, url);
+    throw new BridgeError(e.code, e.message, 0);
   }
 }
 
