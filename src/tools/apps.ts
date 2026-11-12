@@ -31,7 +31,11 @@ export function resolve_build_dir(dir: string, root_setting: string | undefined 
   const home = real(homedir());
   const fix = 'Set WP_MCP_BUILD_ROOT to the project directory that holds your build output.';
 
-  if (root === parse(root).root || root === home) {
+  // Too broad if it IS the filesystem root, or if home is the root or anywhere inside it
+  // (a root of /Users would otherwise allow /Users/<me>/Documents).
+  const home_rel = relative(root, home);
+  const contains_home = !(home_rel === '..' || home_rel.startsWith(`..${sep}`) || isAbsolute(home_rel));
+  if (root === parse(root).root || contains_home) {
     throw new Error(`The allowed build root is ${root}, which is too broad to publish from. ${fix}`);
   }
 
@@ -52,6 +56,14 @@ export function resolve_build_dir(dir: string, root_setting: string | undefined 
     throw new Error(`Publishing ${target} is not allowed. ${fix}`);
   }
   if (outside(target)) throw refuse(target);
+
+  // zip_directory skips hidden children, but not a hidden build_dir itself: <root>/.aws would be
+  // zipped with all its non-hidden files. Refuse any hidden segment below the root (judged on the
+  // symlink-resolved path, so a visible link into a hidden directory is caught too).
+  const hidden = relative(root, target).split(sep).find((seg) => seg.startsWith('.') && seg !== '');
+  if (hidden) {
+    throw new Error(`${target} is inside a hidden directory (${hidden}), which is never published. ${fix}`);
+  }
   return target;
 }
 

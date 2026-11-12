@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, realpath, symlink, writeFile, rm } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { unzipSync } from 'fflate';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resolve_build_dir, zip_directory } from '../../src/tools/apps.js';
@@ -92,6 +92,36 @@ describe('resolve_build_dir (jail)', () => {
   it('refuses an unusable root (/ or the home directory) and says how to fix it', () => {
     expect(() => resolve_build_dir('dist', '/')).toThrow(/WP_MCP_BUILD_ROOT/);
     expect(() => resolve_build_dir('dist', homedir())).toThrow(/WP_MCP_BUILD_ROOT/);
+  });
+
+  it('refuses a root that CONTAINS the home directory (e.g. /Users), not just home itself', () => {
+    const parent = dirname(homedir());
+    expect(() => resolve_build_dir(join(homedir(), 'Documents'), parent)).toThrow(/too broad|WP_MCP_BUILD_ROOT/);
+    expect(() => resolve_build_dir('anything', parent)).toThrow(/too broad|WP_MCP_BUILD_ROOT/);
+  });
+
+  it.each([
+    ['a hidden directory inside the root', '.secrets'],
+    ['a hidden directory nested in the root', 'app/.aws'],
+    ['a directory inside a hidden directory', '.cache/dist'],
+    ['.git', '.git'],
+  ])('refuses %s even though its own children are not hidden', async (_l, rel) => {
+    await mkdir(join(root, rel), { recursive: true });
+    await writeFile(join(root, rel, 'credentials.json'), '{"token":"x"}');
+    expect(() => resolve_build_dir(join(root, rel), root)).toThrow(/hidden/i);
+    expect(() => resolve_build_dir(rel, root)).toThrow(/hidden/i);
+  });
+
+  it('refuses a visible symlink that resolves into a hidden directory', async () => {
+    await mkdir(join(root, '.private'));
+    await symlink(join(root, '.private'), join(root, 'dist'));
+    expect(() => resolve_build_dir(join(root, 'dist'), root)).toThrow(/hidden/i);
+  });
+
+  it('still allows a root that merely lives under a hidden directory, and dotted but visible names', async () => {
+    const hidden_root = join(root, '.workspace');
+    await mkdir(join(hidden_root, 'dist.v2'), { recursive: true });
+    expect(resolve_build_dir('dist.v2', hidden_root)).toBe(join(hidden_root, 'dist.v2'));
   });
 
   it('reports a missing directory clearly', () => {

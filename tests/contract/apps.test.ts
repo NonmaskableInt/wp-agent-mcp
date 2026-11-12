@@ -222,6 +222,9 @@ describe.skipIf(!bridgeConfigured)('contract: apps from a local build directory'
     await writeFile(join(dir, 'index.html'), '<!doctype html><div id="root"></div><!-- from-dir -->');
     await writeFile(join(dir, 'assets', 'main.js'), 'console.log("from-dir")');
     await writeFile(join(dir, '.env'), 'SECRET=should-never-upload');
+    await mkdir(join(base, '.hidden-dist'));
+    await writeFile(join(base, '.hidden-dist', 'index.html'), '<div id="root">hidden-secret</div>');
+    await writeFile(join(base, '.hidden-dist', 'credentials.json'), '{"token":"hidden-secret"}');
 
     outside = await realpath(await mkdtemp(join(tmpdir(), 'build-outside-')));
     await writeFile(join(outside, 'index.html'), '<div id="root">outside-secret</div>');
@@ -260,18 +263,29 @@ describe.skipIf(!bridgeConfigured)('contract: apps from a local build directory'
   it.each([
     ['a directory outside the root', () => outside],
     ['a .. traversal out of the root', () => `${base}/../${outside.split('/').pop()}`],
+    ['a hidden directory inside the root', () => `${base}/.hidden-dist`],
     ['the filesystem root', () => '/'],
     ['/etc', () => '/etc'],
     ['the home directory', async () => (await import('node:os')).homedir()],
-  ])('refuses %s and uploads nothing', async (_l, pick) => {
+  ])('refuses %s and uploads nothing', async (label, pick) => {
+    // Unique slug per case so one wrongly-accepted deploy cannot cascade into the others.
+    const id = label.replace(/[^a-z0-9]+/gi, '').toLowerCase().slice(0, 12);
+    const esc = `${SLUG}-esc-${id}`;
     const target = await pick();
     const before = JSON.stringify((await s.call('app_list')).json);
-    const d = await s.call('app_deploy', { slug: `${SLUG}-esc`, mount: `${MOUNT}-esc`, build_dir: target });
-    expect(d.isError, d.text).toBe(true);
-    expect(d.text).toMatch(/deploy_failed/);
-    expect(d.text).not.toContain('outside-secret');
-    expect(JSON.stringify((await s.call('app_list')).json)).toBe(before);
-    expect((await get(`${MOUNT}-esc/`)).text).not.toContain('outside-secret');
+    try {
+      const d = await s.call('app_deploy', { slug: esc, mount: `${MOUNT}-esc-${id}`, build_dir: target });
+      expect(d.isError, d.text).toBe(true);
+      expect(d.text).toMatch(/deploy_failed/);
+      expect(d.text).not.toContain('outside-secret');
+      expect(d.text).not.toContain('hidden-secret');
+      expect(JSON.stringify((await s.call('app_list')).json)).toBe(before);
+      const page = (await get(`${MOUNT}-esc-${id}/`)).text;
+      expect(page).not.toContain('outside-secret');
+      expect(page).not.toContain('hidden-secret');
+    } finally {
+      await s.call('app_delete', { slug: esc });
+    }
   });
 
   it('refuses a symlink inside the root that leads outside it', async () => {
