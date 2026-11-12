@@ -26,6 +26,10 @@ npm run inspect         # Launch MCP Inspector against dist/index.js
 
 # Testing
 npm test                # Run tests with vitest
+# Contract tests (tests/contract) drive the real MCP tools against a live bridge and
+# skip themselves unless BRIDGE_TEST_URL / BRIDGE_TEST_USER / BRIDGE_TEST_PASSWORD are set.
+# Test files run one at a time (fileParallelism: false) because they share one WordPress.
+# Stand up a throwaway WordPress with ../php-agent-bridge/dev (see its CLAUDE.md).
 
 # Run the compiled server directly
 node dist/index.js      # stdio transport (default)
@@ -55,6 +59,13 @@ src/
                   theme_update, theme_delete, theme_mods_get, theme_mods_set,
                   customizer_export, customizer_import
     users.ts      user_list, user_get
+    files.ts      file_list, file_read, file_write, file_delete, file_backups,
+                  file_restore
+    apps.ts       app_deploy, app_list, app_get, app_rollback, app_delete
+                  (app_deploy zips a local build_dir with fflate, or takes a prebuilt zip)
+    headless.ts   headless_get, headless_set, headless_preview_link
+    content.ts    content_model_get, content_type_set/delete, content_taxonomy_set/delete,
+                  content_meta_set/delete
     cli.ts        wp_cli_run
     database.ts   db_list_tables, db_get_schema, db_select, db_query
 ```
