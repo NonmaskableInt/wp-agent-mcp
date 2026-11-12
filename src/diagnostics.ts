@@ -1,5 +1,6 @@
 import { validate_env } from './env.js';
 import { enrich_error, explain_http_failure, explain_network_error } from './errors.js';
+import { fetch_same_origin, is_redirect, redirect_message } from './safe-fetch.js';
 
 export type StepStatus = 'ok' | 'warn' | 'fail' | 'skipped';
 
@@ -41,10 +42,13 @@ type Outcome =
 
 async function request(url: string, timeoutMs: number, authorization?: string): Promise<Outcome> {
   try {
-    const res = await fetch(url, {
-      headers: { Accept: 'application/json', ...(authorization ? { Authorization: authorization } : {}) },
+    const res = await fetch_same_origin(url, {
+      headers: { Accept: 'application/json', ...(authorization ? { Authorization: authorization, 'X-Agent-Authorization': authorization } : {}) },
       signal: AbortSignal.timeout(timeoutMs),
     });
+    if (is_redirect(res.status)) {
+      return { kind: 'error', code: 'redirect_blocked', message: redirect_message(res, url) };
+    }
     const text = await res.text();
     let json: any;
     try {
