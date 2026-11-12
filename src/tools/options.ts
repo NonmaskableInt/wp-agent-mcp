@@ -30,7 +30,7 @@ export function register(server: McpServer, client: BridgeClient): void {
     },
     async (input) => {
       try {
-        const data = await client.patch('/options', { options: input.options });
+        const data = await client.patch('/options', input.options);
         return tool_success(data);
       } catch (err) {
         return handle_tool_error(err);
