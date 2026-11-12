@@ -50,5 +50,6 @@ installed, one command builds a throwaway stack, runs them, and removes it:
 ```
 
 Pull requests run CI automatically: typecheck, build and unit tests on Node 20 and 22, then the contract
-tests against the php-agent-bridge branch **with the same name as yours** if it exists (so a change spanning
-both repos is tested together), otherwise against its `main`.
+tests against the php-agent-bridge branch **with the same name as yours** while that branch has an open PR (so a change
+spanning both repos is tested together), otherwise against its `main`. (A merged branch that still exists is ignored on
+purpose: it is stale.)

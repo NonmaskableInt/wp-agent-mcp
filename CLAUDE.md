@@ -32,7 +32,7 @@ npm test                # Run tests with vitest
 # Stand up a throwaway WordPress and run everything with one command:
 #   ../php-agent-bridge/dev/run-contract-tests.sh .   (see that repo's CLAUDE.md; needs podman or docker)
 # CI (.github/workflows/ci.yml) runs typecheck + build + unit tests on Node 20/22, then this against the
-# php-agent-bridge branch with the same name as the PR's (else main).
+# php-agent-bridge branch with the same name as the PR's, but only while that branch has an open PR (else main).
 
 # Run the compiled server directly
 node dist/index.js      # stdio transport (default)
